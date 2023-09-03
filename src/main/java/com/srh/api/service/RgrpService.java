@@ -25,7 +25,7 @@ public class RgrpService {
     @Autowired
     private RecommendationRatingRepository recommendationRatingRepository;
 
-    public Double getRgrp(Integer ProjectId, Integer AlgorithmId, ArrayList<Double>[] Groups) {
+    public Double getRgrp(Integer ProjectId, Integer AlgorithmId, ArrayList<Integer>[] Groups) {
 
         ArrayList<Double> liUser = new ArrayList<>();
         double auxli = 0;
@@ -51,10 +51,12 @@ public class RgrpService {
 
         List<List<Double>> rindvUserGroups = new ArrayList<>();
         ArrayList<Double> rgrpGroups = new ArrayList<>();
+        double somaRindvUserId = 0.0;
 
         for(int i = 0; i < Groups.length; i++){
+            rindvUserGroups.add(new ArrayList<>());
             for(int j = 0; j < Groups[i].size(); j++){
-                int userId = Groups[i].get(j).intValue();
+                int userId = Groups[i].get(j);
                 for (Recommendation r : lista1) {
                     for (RecommendationRating irr : lista2) {
                         if (r.getEvaluator().getId() == irr.getEvaluator().getId() &&
@@ -67,14 +69,20 @@ public class RgrpService {
                 }
                 double rindvUserId = auxli / xComparacao;
                 somaRindvUserId = somaRindvUserId + rindvUserId;
-                rindvUserGroups[i].add(rindvUserId); // Inserir a injustiça individual do usuário (userID) como elemento de um dos grupos (vetores)
+                rindvUserGroups.get(i).add(rindvUserId); //Inserir a injustiça individual do usuário (userID) como elemento de um dos grupos (vetores)
             }
-            rgrpGroups[i].add(somaRindvUserId/Groups[i].size());//rgrpGroups[i].add(sum(lista)/len(lista));
+            rgrpGroups.add(somaRindvUserId/Groups[i].size()); //rgrpGroups[i].add(sum(lista)/len(lista));
+            somaRindvUserId = 0.0;
+            xComparacao = 0;
+            auxli = 0;
         }
 
-
-
         // Calcular a variância considerando os valores armazenados em rgrpGroups
+
+        for (Double lIs : rgrpGroups) {
+            auxRgrp = auxRgrp + (Math.pow(lIs - mediaLI, 2));
+        }
+        auxRgrp = auxRgrp / rgrpGroups.size();
 
         return auxRgrp;
     }

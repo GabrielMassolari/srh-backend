@@ -24,7 +24,7 @@ public class RgrpController {
     public Double findARindv(@RequestBody JsonNode requestBody) {
         Integer projectId = requestBody.get("ProjectId").asInt();
         Integer algorithmId = requestBody.get("AlgorithmId").asInt();
-        ArrayList<Double>[] groups = new ObjectMapper().convertValue(requestBody.get("Groups"), ArrayList[].class);
+        ArrayList<Integer>[] groups = new ObjectMapper().convertValue(requestBody.get("Groups"), ArrayList[].class);
 
         Project project = projectService.find(projectId);
         if (project.getId().equals(projectId)) {
