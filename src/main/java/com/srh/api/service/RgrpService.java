@@ -70,19 +70,34 @@ public class RgrpService {
                 double rindvUserId = auxli / xComparacao;
                 somaRindvUserId = somaRindvUserId + rindvUserId;
                 rindvUserGroups.get(i).add(rindvUserId); //Inserir a injustiça individual do usuário (userID) como elemento de um dos grupos (vetores)
+                auxli = 0;
+                xComparacao = 0;
             }
             rgrpGroups.add(somaRindvUserId/Groups[i].size()); //rgrpGroups[i].add(sum(lista)/len(lista));
             somaRindvUserId = 0.0;
-            xComparacao = 0;
-            auxli = 0;
+
         }
 
-        // Calcular a variância considerando os valores armazenados em rgrpGroups
+        for(int i = 0; i < rindvUserGroups.size(); i++) {
+            for (int j = 0; j < rindvUserGroups.get(i).size(); j++) {
+                auxLI = auxLI + rindvUserGroups.get(i).get(j);
+            }
+            auxLI = auxLI / rindvUserGroups.get(i).size();
+            lIUser.add(auxLI);
+            auxLI = 0;
+        }
 
-        for (Double lIs : rgrpGroups) {
+        for (int i = 0; i < lIUser.size(); i++) {
+            auxLI = auxLI + lIUser.get(i);
+        }
+        mediaLI = auxLI / lIUser.size();
+
+        for (Double lIs : lIUser) {
             auxRgrp = auxRgrp + (Math.pow(lIs - mediaLI, 2));
         }
-        auxRgrp = auxRgrp / rgrpGroups.size();
+        auxRgrp = auxRgrp / lIUser.size();
+
+        rgrp.add(auxRgrp);
 
         return auxRgrp;
     }
