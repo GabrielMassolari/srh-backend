@@ -1,6 +1,7 @@
 package com.srh.api.repository;
 
 import com.srh.api.model.Algorithm;
+import com.srh.api.model.ItemRating;
 import com.srh.api.model.Project;
 import com.srh.api.model.Recommendation;
 import org.springframework.data.domain.Page;
@@ -8,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.PagingAndSortingRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface RecommendationRepository extends PagingAndSortingRepository<Recommendation, Integer> {
     @Query(
@@ -27,4 +29,7 @@ public interface RecommendationRepository extends PagingAndSortingRepository<Rec
     List<Recommendation> findByAlgorithm(Algorithm algorithm);
     List<Recommendation> findByMatrixId(Integer matrixId);
     List<Recommendation> findByItem(Integer itemId);
+
+    @Query("SELECT * FROM RECOMMENDATION WHERE evaluator_id = ?1 AND item_id = ?2 AND algorithm_id = ?3 ;")
+    Optional<Recommendation> findByEvaluatorAndItem(Integer evaluatorId, Integer itemId, Integer algorithmId);
 }
