@@ -3,6 +3,7 @@ package com.srh.api.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.srh.api.model.Project;
+import com.srh.api.service.FairnessRecommendationService;
 import com.srh.api.service.ProjectService;
 import com.srh.api.service.RgrpService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,9 @@ public class RgrpController {
     @Autowired
     private ProjectService projectService;
 
+    @Autowired
+    private FairnessRecommendationService fairnessRecommendationService;
+
     @PostMapping("/test")
     public Double findARindv(@RequestBody JsonNode requestBody) {
         Integer projectId = requestBody.get("ProjectId").asInt();
@@ -32,6 +36,16 @@ public class RgrpController {
             return rgrp;
         }
         return 0.0;
+    }
+
+    @PostMapping("/getx1")
+    public double[][] genx1(@RequestBody JsonNode requestBody) {
+        Integer projectId = requestBody.get("ProjectId").asInt();
+        Integer algorithmId = requestBody.get("AlgorithmId").asInt();
+
+        Project project = projectService.find(projectId);
+        double[][] x1 = fairnessRecommendationService.getFairnessRecomendation(projectId, algorithmId);
+        return x1;
     }
 
 }
