@@ -41,6 +41,7 @@ public class FairnessRecommendationService {
 
         int[] celulasConhecidas = new int[usuarios];
         int[] celulasNaoConhecidas = new int[usuarios];
+        double[] difMediaUsuarios = new double[usuarios];
 
 
         double calculandoli[] = new double[usuarios];
@@ -119,25 +120,42 @@ public class FairnessRecommendationService {
             }
         }
 
-
+        double auxLi = 0;
+        double auxMedia = 0;
+        int qtdRepeticao = 0;
         //CALCULANDO LI ( U = USUARIO DA POSIÇÃO ZERO (0))
-        int u = 0;
-        while (u < coluna) {
-            //COMPRANDO OS ERROS DA MATRIZE ESTIMADAS - A MATRIZ ORIGINAL
-            for (int lo = 0; lo < xoriginal.length; lo++) {
-                //int u = 0;
-                if (xoriginal[lo][u] != 0) {
-                    calculandoli[u] = calculandoli[u] + (Math.pow(xavaliacao[lo][u] - xestimada[lo][u], 2));
+        for(int l = 0; l < linha; l++){
+            for(int c = 0; c < coluna; c++){
+                if(xoriginal[l][c] == 0) {
+                    auxLi = auxLi + (Math.pow(xestimada[l][c] - xavaliacao[l][c], 2) / 4);
+                    auxMedia = xestimada[l][c] - xavaliacao[l][c];
+                    qtdRepeticao++;
                 }
             }
-            u++;
+            li[l] = auxLi / qtdRepeticao;
+            difMediaUsuarios[l] = auxMedia / qtdRepeticao;
+            auxMedia = 0;
+            auxLi = 0;
+            qtdRepeticao = 0;
         }
 
-        //ENCONTRANDO O li DA JUSTIÇA INDIVIDUAL DE CADA USUÁRIO
-        for (int i = 0; i < usuarios; i++) {
-            li[i] = calculandoli[i] / celulasConhecidas[i];
-            //System.out.println("LI[" + i + "]: " + li[i]);
-        }
+//        int u = 0;
+//        while (u < coluna) {
+//            //COMPRANDO OS ERROS DA MATRIZE ESTIMADAS - A MATRIZ ORIGINAL
+//            for (int lo = 0; lo < xoriginal.length; lo++) {
+//                //int u = 0;
+//                if (xoriginal[lo][u] == 0) {
+//                    calculandoli[u] = calculandoli[u] + (Math.pow(xavaliacao[lo][u] - xestimada[lo][u], 2));
+//                }
+//            }
+//            u++;
+//        }
+
+//        //ENCONTRANDO O li DA JUSTIÇA INDIVIDUAL DE CADA USUÁRIO
+//        for (int i = 0; i < usuarios; i++) {
+//            li[i] = calculandoli[i] / celulasConhecidas[i];
+//            //System.out.println("LI[" + i + "]: " + li[i]);
+//        }
 
         double[][] x1 = new double[linha][coluna];
         for(int l = 0; l < linha; l++){
@@ -146,9 +164,14 @@ public class FairnessRecommendationService {
                     Random random = new Random();
 
                     double numeroAleatorio = random.nextDouble();
+                    double numeroFinal = 0;
 
                     // Calcule o número aleatório ajustado para o intervalo desejado
-                    double numeroFinal = xestimada[l][c] + (numeroAleatorio * li[l]);
+                    if(difMediaUsuarios[l] >= 0){
+                        numeroFinal = xestimada[l][c] + (numeroAleatorio * li[l]);
+                    }else {
+                        numeroFinal = xestimada[l][c] - (numeroAleatorio * li[l]);
+                    }
                     x1[l][c] = numeroFinal;
                 }else {
                     x1[l][c] = xoriginal[l][c];
@@ -156,6 +179,6 @@ public class FairnessRecommendationService {
             }
         }
 
-        return xavaliacao;
+        return x1;
     }
 }
