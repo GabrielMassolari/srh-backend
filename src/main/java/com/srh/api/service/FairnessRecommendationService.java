@@ -27,6 +27,9 @@ public class FairnessRecommendationService {
     @Autowired
     private RecommendationRepository recommendationRepository;
 
+    @Autowired
+    private RecommendationRatingRepository recommendationRatingRepository;
+
     public double[][] getFairnessRecomendation(Integer ProjectId, Integer algorithmId) {
         final int usuarios = (int) evaluatorRepository.count();
         final int linha = usuarios;
@@ -34,6 +37,7 @@ public class FairnessRecommendationService {
 
         double[][] xoriginal = new double[linha][coluna];
         double[][] xestimada = new double[linha][coluna];
+        double[][] xavaliacao = new double[linha][coluna];
 
         int[] celulasConhecidas = new int[usuarios];
         int[] celulasNaoConhecidas = new int[usuarios];
@@ -56,13 +60,14 @@ public class FairnessRecommendationService {
         ItemRating avaliacao;
         for(int l = 0; l < linha; l++) {
             for(int c = 0; c < coluna; c++){
-                avaliacaoResultado = itemRatingRepository.findByEvaluatorAndItem(l, c);
+                avaliacaoResultado = itemRatingRepository.findByEvaluatorAndItem(l+1, c+1);
                 if (avaliacaoResultado.isPresent()) {
                     avaliacao = avaliacaoResultado.get();
                     xoriginal[l][c] = avaliacao.getScore();
+                    celulasConhecidas[l]++;
                 }else {
                     xoriginal[l][c] = 0;
-                    celulasConhecidas[l]++;
+                    celulasNaoConhecidas[l]++;
                 }
             }
         }
@@ -74,8 +79,8 @@ public class FairnessRecommendationService {
         Recommendation recomendacao;
         for(int l = 0; l < linha; l++) {
             for(int c = 0; c < coluna; c++){
-                if(xoriginal[l][c] == -1){
-                    recomendacaoResultado = recommendationRepository.findByEvaluatorAndItem(l, c, algorithmId);
+                if(xoriginal[l][c] == 0){
+                    recomendacaoResultado = recommendationRepository.findByEvaluatorAndItem(l+1, c+1, algorithmId);
                     if(recomendacaoResultado.isPresent()){
                         recomendacao = recomendacaoResultado.get();
                         xestimada[l][c] = recomendacao.getWeight();
@@ -90,6 +95,30 @@ public class FairnessRecommendationService {
             }
         }
 
+        //Gerar Xavalicao
+        Optional<RecommendationRating> avaliacaoRecomendacaoResultado;
+        RecommendationRating avaliacaoRecomendacao;
+        for(int l = 0; l < linha; l++) {
+            for(int c = 0; c < coluna; c++){
+                if(xoriginal[l][c] == 0){
+                    recomendacaoResultado = recommendationRepository.findByEvaluatorAndItem(l+1, c+1, algorithmId);
+
+                    if(recomendacaoResultado.isPresent()){
+                        recomendacao = recomendacaoResultado.get();
+                        int recomendacaoId = recomendacao.getId();
+                        avaliacaoRecomendacaoResultado = recommendationRatingRepository.findByRecommendationId(recomendacaoId);
+
+                        if(avaliacaoRecomendacaoResultado.isPresent()){
+                            avaliacaoRecomendacao = avaliacaoRecomendacaoResultado.get();
+                            xavaliacao[l][c] = avaliacaoRecomendacao.getScore();
+                        }
+                    }
+                }else{
+                    xavaliacao[l][c] = xoriginal[l][c];
+                }
+            }
+        }
+
 
         //CALCULANDO LI ( U = USUARIO DA POSIÇÃO ZERO (0))
         int u = 0;
@@ -98,7 +127,7 @@ public class FairnessRecommendationService {
             for (int lo = 0; lo < xoriginal.length; lo++) {
                 //int u = 0;
                 if (xoriginal[lo][u] != 0) {
-                    calculandoli[u] = calculandoli[u] + (Math.pow(xestimada[lo][u] - xoriginal[lo][u], 2));
+                    calculandoli[u] = calculandoli[u] + (Math.pow(xavaliacao[lo][u] - xestimada[lo][u], 2));
                 }
             }
             u++;
@@ -107,6 +136,7 @@ public class FairnessRecommendationService {
         //ENCONTRANDO O li DA JUSTIÇA INDIVIDUAL DE CADA USUÁRIO
         for (int i = 0; i < usuarios; i++) {
             li[i] = calculandoli[i] / celulasConhecidas[i];
+            //System.out.println("LI[" + i + "]: " + li[i]);
         }
 
         double[][] x1 = new double[linha][coluna];
@@ -126,6 +156,6 @@ public class FairnessRecommendationService {
             }
         }
 
-        return x1;
+        return xavaliacao;
     }
 }

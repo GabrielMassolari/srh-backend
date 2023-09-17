@@ -10,6 +10,6 @@ import java.util.Optional;
 public interface ItemRatingRepository extends PagingAndSortingRepository<ItemRating, ItemRatingPK> {
     Optional<ItemRating> findById(ItemRatingPK itemRatingPK);
 
-    @Query("SELECT * FROM ITEM_RATING WHERE evaluator_id = ?1 AND item_id = ?2")
+    @Query(value="SELECT * FROM ITEM_RATING WHERE evaluator_id = ?1 AND item_id = ?2", nativeQuery = true)
     Optional<ItemRating> findByEvaluatorAndItem(Integer evaluatorId, Integer itemId);
 }

@@ -30,6 +30,6 @@ public interface RecommendationRepository extends PagingAndSortingRepository<Rec
     List<Recommendation> findByMatrixId(Integer matrixId);
     List<Recommendation> findByItem(Integer itemId);
 
-    @Query("SELECT * FROM RECOMMENDATION WHERE evaluator_id = ?1 AND item_id = ?2 AND algorithm_id = ?3")
+    @Query(value="SELECT * FROM RECOMMENDATION WHERE evaluator_id = ?1 AND item_id = ?2 AND algorithm_id = ?3", nativeQuery = true)
     Optional<Recommendation> findByEvaluatorAndItem(Integer evaluatorId, Integer itemId, Integer algorithmId);
 }
