@@ -8,10 +8,7 @@ import com.srh.api.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
+import java.util.*;
 
 @Service
 public class FairnessRecommendationService {
@@ -178,6 +175,29 @@ public class FairnessRecommendationService {
                 }
             }
         }
+
+        double lix[] = new double[usuarios];
+        auxLi = 0;
+        auxMedia = 0;
+        qtdRepeticao = 0;
+        //CALCULANDO LI ( U = USUARIO DA POSIÇÃO ZERO (0))
+        for(int l = 0; l < linha; l++){
+            for(int c = 0; c < coluna; c++){
+                if(xoriginal[l][c] == 0) {
+                    auxLi = auxLi + (Math.pow(x1[l][c] - xavaliacao[l][c], 2) / 4);
+                    auxMedia = x1[l][c] - xavaliacao[l][c];
+                    qtdRepeticao++;
+                }
+            }
+            lix[l] = auxLi / qtdRepeticao;
+            difMediaUsuarios[l] = auxMedia / qtdRepeticao;
+            auxMedia = 0;
+            auxLi = 0;
+            qtdRepeticao = 0;
+        }
+
+        System.out.println("Antes: " + Arrays.toString(li));
+        System.out.println("Dps: " + Arrays.toString(lix));
 
         return x1;
     }
