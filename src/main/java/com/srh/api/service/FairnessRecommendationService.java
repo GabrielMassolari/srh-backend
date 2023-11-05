@@ -27,7 +27,7 @@ public class FairnessRecommendationService {
     @Autowired
     private RecommendationRatingRepository recommendationRatingRepository;
 
-    public double[][] getFairnessRecomendation(Integer ProjectId, Integer algorithmId) {
+    public double[][] getFairnessRecomendation(Integer ProjectId, Integer algorithmId, Integer list_number, ArrayList<Integer>[] Groups) {
         final int usuarios = (int) evaluatorRepository.count();
         final int linha = usuarios;
         final int coluna = (int) itemRepository.count();
@@ -47,6 +47,58 @@ public class FairnessRecommendationService {
         double totali = 0;
         double mediali = 0;
         double rindv = 0;
+
+        // Geração do G
+        Map<Integer, ArrayList<Integer>> G = new HashMap<>();
+        for (int i = 0; i < Groups.length; i++) {
+            G.put(i + 1, Groups[i]);
+        }
+
+        // Geração do G_index
+        Map<Integer, ArrayList<Integer>> G_index = new HashMap<>();
+        for (int i = 0; i < Groups.length; i++) {
+            // Cria uma nova lista para armazenar os valores decrementados
+            ArrayList<Integer> decrementedValues = new ArrayList<>();
+            for (int val : Groups[i]) {
+                decrementedValues.add(val - 1); // Decrementa cada valor
+            }
+            // Adiciona a lista de valores decrementados ao mapa com a chave sendo i + 1
+            G_index.put(i + 1, decrementedValues);
+        }
+
+        //Geração do Users_g
+
+        HashMap<Integer, List<String>> users_g = new HashMap<>();
+
+        for (Map.Entry<Integer, ArrayList<Integer>> entry : G.entrySet()) {
+            Integer groupNumber = entry.getKey();
+            ArrayList<Integer> users = entry.getValue();
+
+            List<String> userIdentifiers = new ArrayList<>();
+            for (Integer user : users) {
+                userIdentifiers.add("U" + user);
+            }
+
+            users_g.put(groupNumber, userIdentifiers);
+        }
+
+
+        // Geração do ls_G
+        HashMap<Integer, List<String>> ls_g = new HashMap<>();
+
+        for (Map.Entry<Integer, ArrayList<Integer>> entry : G.entrySet()) {
+            Integer groupNumber = entry.getKey();
+
+            List<String> lsIdentifier = new ArrayList<>();
+            for(int i = 0; i < list_number; i++) {
+                lsIdentifier.add("l" + (i+1));
+            }
+
+            ls_g.put(groupNumber, lsIdentifier);
+        }
+
+
+
 
         Iterable<ItemRating> avaliacoesItens =
                 itemRatingRepository.findAll();
@@ -195,6 +247,11 @@ public class FairnessRecommendationService {
             auxLi = 0;
             qtdRepeticao = 0;
         }
+
+        System.out.println(G);
+        System.out.println(G_index);
+        System.out.println(users_g);
+        System.out.println(ls_g);
 
         System.out.println("Antes: " + Arrays.toString(li));
         System.out.println("Dps: " + Arrays.toString(lix));

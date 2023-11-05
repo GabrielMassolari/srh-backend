@@ -42,9 +42,11 @@ public class RgrpController {
     public double[][] genx1(@RequestBody JsonNode requestBody) {
         Integer projectId = requestBody.get("ProjectId").asInt();
         Integer algorithmId = requestBody.get("AlgorithmId").asInt();
+        Integer listNumber = requestBody.get("ListNumber").asInt();
+        ArrayList<Integer>[] groups = new ObjectMapper().convertValue(requestBody.get("Groups"), ArrayList[].class);
 
         Project project = projectService.find(projectId);
-        double[][] x1 = fairnessRecommendationService.getFairnessRecomendation(projectId, algorithmId);
+        double[][] x1 = fairnessRecommendationService.getFairnessRecomendation(projectId, algorithmId, listNumber, groups);
         return x1;
     }
 
