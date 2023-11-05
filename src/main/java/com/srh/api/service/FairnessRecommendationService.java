@@ -7,6 +7,7 @@ import com.srh.api.model.RecommendationRating;
 import com.srh.api.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import gurobi.*;
 
 import java.util.*;
 
@@ -247,6 +248,18 @@ public class FairnessRecommendationService {
             auxLi = 0;
             qtdRepeticao = 0;
         }
+
+        try{
+            GRBEnv env = new GRBEnv(true);
+            env.set("logFile", "mip.log");
+            env.start();
+
+            GRBModel m = new GRBModel(env);
+        }catch (GRBException e) {
+            System.out.println("Error code: " + e.getErrorCode() + ". " +
+                    e.getMessage());
+        }
+
 
         System.out.println(G);
         System.out.println(G_index);
