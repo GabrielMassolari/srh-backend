@@ -1,34 +1,27 @@
 package com.srh.api.model;
 
-public class Tuple<X, Y> {
-    public final X x;
-    public final Y y;
+public class Tuple {
+    String user;
+    String location;
 
-    public Tuple(X x, Y y) {
-        this.x = x;
-        this.y = y;
+    public Tuple(String user, String location) {
+        this.user = user;
+        this.location = location;
     }
+
+    // You should also implement equals() and hashCode() for Tuple to work correctly as a key in HashMap.
+    // Java requires that if two objects are equal, they must have the same hash code.
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-
-        Tuple<?, ?> tuple = (Tuple<?, ?>) o;
-
-        if (!x.equals(tuple.x)) return false;
-        return y.equals(tuple.y);
+        Tuple tuple = (Tuple) o;
+        return user.equals(tuple.user) && location.equals(tuple.location);
     }
 
     @Override
     public int hashCode() {
-        int result = x.hashCode();
-        result = 31 * result + y.hashCode();
-        return result;
-    }
-
-    @Override
-    public String toString() {
-        return "(" + x + ", " + y + ")";
+        return 31 * user.hashCode() + location.hashCode();
     }
 }

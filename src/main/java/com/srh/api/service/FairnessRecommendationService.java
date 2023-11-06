@@ -4,6 +4,7 @@ package com.srh.api.service;
 import com.srh.api.model.ItemRating;
 import com.srh.api.model.Recommendation;
 import com.srh.api.model.RecommendationRating;
+import com.srh.api.model.Tuple;
 import com.srh.api.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -32,10 +33,13 @@ public class FairnessRecommendationService {
         final int usuarios = (int) evaluatorRepository.count();
         final int linha = usuarios;
         final int coluna = (int) itemRepository.count();
+        int n_groups = Groups.length;
 
         double[][] xoriginal = new double[linha][coluna];
         double[][] xestimada = new double[linha][coluna];
         double[][] xavaliacao = new double[linha][coluna];
+
+        double[][][] lista_x = new double[list_number][][];
 
         int[] celulasConhecidas = new int[usuarios];
         int[] celulasNaoConhecidas = new int[usuarios];
@@ -208,45 +212,67 @@ public class FairnessRecommendationService {
 //        }
 
         double[][] x1 = new double[linha][coluna];
-        for(int l = 0; l < linha; l++){
-            for(int c = 0; c < coluna; c++){
-                if (xoriginal[l][c] == 0){
-                    Random random = new Random();
+        for(int i = 0; i < list_number; i++){
+            x1 = new double[linha][coluna];
+            for(int l = 0; l < linha; l++){
+                for(int c = 0; c < coluna; c++){
+                    if (xoriginal[l][c] == 0){
+                        Random random = new Random();
 
-                    double numeroAleatorio = random.nextDouble();
-                    double numeroFinal = 0;
+                        double numeroAleatorio = random.nextDouble();
+                        double numeroFinal = 0;
 
-                    // Calcule o número aleatório ajustado para o intervalo desejado
-                    if(difMediaUsuarios[l] >= 0){
-                        numeroFinal = xestimada[l][c] + (numeroAleatorio * li[l]);
+                        // Calcule o número aleatório ajustado para o intervalo desejado
+                        if(difMediaUsuarios[l] >= 0){
+                            numeroFinal = xestimada[l][c] + (numeroAleatorio * li[l]);
+                        }else {
+                            numeroFinal = xestimada[l][c] - (numeroAleatorio * li[l]);
+                        }
+                        x1[l][c] = numeroFinal;
                     }else {
-                        numeroFinal = xestimada[l][c] - (numeroAleatorio * li[l]);
+                        x1[l][c] = xoriginal[l][c];
                     }
-                    x1[l][c] = numeroFinal;
-                }else {
-                    x1[l][c] = xoriginal[l][c];
                 }
             }
+            lista_x[i] = x1;
         }
 
+
         double lix[] = new double[usuarios];
+        double[][] list_lix = new double[list_number][usuarios];
         auxLi = 0;
         auxMedia = 0;
         qtdRepeticao = 0;
         //CALCULANDO LI ( U = USUARIO DA POSIÇÃO ZERO (0))
-        for(int l = 0; l < linha; l++){
-            for(int c = 0; c < coluna; c++){
-                if(xoriginal[l][c] == 0) {
-                    auxLi = auxLi + (Math.pow(x1[l][c] - xavaliacao[l][c], 2) / 4);
-                    auxMedia = x1[l][c] - xavaliacao[l][c];
-                    qtdRepeticao++;
+        for(int i = 0; i < list_number; i++){
+            lix = new double[usuarios];
+            for(int l = 0; l < linha; l++){
+                for(int c = 0; c < coluna; c++){
+                    if(xoriginal[l][c] == 0) {
+                        auxLi = auxLi + (Math.pow(lista_x[i][l][c] - xavaliacao[l][c], 2) / 4);
+                        auxMedia = lista_x[i][l][c] - xavaliacao[l][c];
+                        qtdRepeticao++;
+                    }
+                }
+                lix[l] = auxLi / qtdRepeticao;
+                difMediaUsuarios[l] = auxMedia / qtdRepeticao;
+                auxMedia = 0;
+                auxLi = 0;
+                qtdRepeticao = 0;
+            }
+            list_lix[i] = lix;
+        }
+
+        List<Map<Tuple, Double>> listPreferences = new ArrayList<>();
+
+        for(int g = 0; g < n_groups; g++){
+            listPreferences.add(new HashMap<Tuple, Double>());
+            for(int u: G_index.get(g+1)){
+                for(int i = 0; i < ls_g.get(g+1).size(); i++){
+                    String user_n = ("U" + (u+1));
+                    listPreferences.get(g).put(new Tuple(user_n, ls_g.get(g+1).get(i)), list_lix[i][u]);
                 }
             }
-            lix[l] = auxLi / qtdRepeticao;
-            difMediaUsuarios[l] = auxMedia / qtdRepeticao;
-            auxMedia = 0;
-            auxLi = 0;
-            qtdRepeticao = 0;
         }
 
         try{
@@ -255,6 +281,79 @@ public class FairnessRecommendationService {
             env.start();
 
             GRBModel m = new GRBModel(env);
+
+            HashMap<Tuple, GRBVar> xVars = new HashMap<>();
+
+            for (Integer groupId : users_g.keySet()) {
+                List<String> users = users_g.get(groupId);
+                List<String> locations = ls_g.get(groupId);
+                Map<Tuple, Double> preferences = listPreferences.get(groupId - 1);
+
+                for (String user : users) {
+                    for (String location : locations) {
+                        Tuple key = new Tuple(user, location);
+                        Double coeff = preferences.get(key);
+                        GRBVar var = m.addVar(0.0, 1.0, coeff, GRB.BINARY, "x_" + user + "_" + location);
+                        xVars.put(key, var);
+                    }
+                }
+            }
+            m.update();
+
+            GRBLinExpr objExpr = new GRBLinExpr();
+
+            double sumL = 0.0;
+            double sumSquaredL = 0.0;
+
+            for (Integer groupId : users_g.keySet()) {
+                GRBLinExpr sumInjustices = new GRBLinExpr();
+                List<String> users = users_g.get(groupId);
+
+                for (String user : users) {
+                    for (String location : ls_g.get(groupId)) {
+                        Tuple key = new Tuple(user, location);
+                        sumInjustices.addTerm(listPreferences.get(groupId - 1).get(key), xVars.get(key));
+                    }
+                }
+
+                GRBVar L = m.addVar(0.0, GRB.INFINITY, 0.0, GRB.CONTINUOUS, "L_" + groupId);
+                m.addConstr(L, GRB.EQUAL, sumInjustices, "avgInjustice_" + groupId);
+
+                double LMean = sumInjustices.getValue() / users.size();
+                sumL += LMean;
+                sumSquaredL += LMean * LMean;
+            }
+
+            double groupCount = users_g.size();
+            double LMean = sumL / groupCount;
+            objExpr.addConstant(sumSquaredL / groupCount - LMean * LMean);
+
+            m.setObjective(objExpr, GRB.MINIMIZE);
+
+            for (Integer groupId : users_g.keySet()) {
+                List<String> users = users_g.get(groupId);
+
+                for (String user : users) {
+                    GRBLinExpr lhs = new GRBLinExpr();
+
+                    for (String location : ls_g.get(groupId)) {
+                        Tuple key = new Tuple(user, location);
+                        lhs.addTerm(1.0, xVars.get(key));
+                    }
+
+                    String constrName = "assign_" + user;
+                    m.addConstr(lhs, GRB.EQUAL, 1.0, constrName);
+                }
+            }
+
+            m.optimize();
+
+            for (Map.Entry<Tuple, GRBVar> entry : xVars.entrySet()) {
+                Tuple key = entry.getKey();
+                GRBVar var = entry.getValue();
+                System.out.println(key + " : " + var.get(GRB.DoubleAttr.X));
+            }
+
         }catch (GRBException e) {
             System.out.println("Error code: " + e.getErrorCode() + ". " +
                     e.getMessage());
@@ -271,4 +370,17 @@ public class FairnessRecommendationService {
 
         return x1;
     }
+
+    private static GRBVar[][] addDecisionVariables(GRBModel model, String[] users, String[] items) throws GRBException {
+        GRBVar[][] variables = new GRBVar[users.length][items.length];
+        for (int i = 0; i < users.length; i++) {
+            for (int j = 0; j < items.length; j++) {
+                variables[i][j] = model.addVar(0.0, 1.0, 0.0, GRB.BINARY, users[i] + "_" + items[j]);
+            }
+        }
+        model.update(); // Integrate new variables
+        return variables;
+    }
+
+
 }
