@@ -103,8 +103,6 @@ public class FairnessRecommendationService {
         }
 
 
-
-
         Iterable<ItemRating> avaliacoesItens =
                 itemRatingRepository.findAll();
         Iterable<Recommendation> recomendacoes =
@@ -282,78 +280,92 @@ public class FairnessRecommendationService {
 
             GRBModel m = new GRBModel(env);
 
-            HashMap<Tuple, GRBVar> xVars = new HashMap<>();
+            //HashMap<Tuple, GRBVar> xVars = new HashMap<>();
+            ArrayList<GRBVar[][]> grbVarList = new ArrayList<>();
 
-            for (Integer groupId : users_g.keySet()) {
-                List<String> users = users_g.get(groupId);
-                List<String> locations = ls_g.get(groupId);
-                Map<Tuple, Double> preferences = listPreferences.get(groupId - 1);
 
-                for (String user : users) {
-                    for (String location : locations) {
-                        Tuple key = new Tuple(user, location);
-                        Double coeff = preferences.get(key);
-                        GRBVar var = m.addVar(0.0, 1.0, coeff, GRB.BINARY, "x_" + user + "_" + location);
-                        xVars.put(key, var);
+            //Adicao variaveis
+            for(int i = 0; i < n_groups; i++){
+                int qtdUser = users_g.get(i+1).size();
+                int qtdL = ls_g.get(i+1).size();
+                GRBVar[][] var = new GRBVar[qtdUser][qtdL];
+                grbVarList.add(var);
+            }
+
+            //Preencher Variaveis
+            for(int g = 0; g < n_groups; g++){
+                int qtdUser = users_g.get(g+1).size();
+                int qtdL = ls_g.get(g+1).size();
+                for(int i = 0; i < qtdUser; i++){
+                    for(int j = 0; j < qtdL; j++){
+                        grbVarList.get(g)[i][j] = m.addVar(0.0, 1.0, 0.0, GRB.BINARY, "x_" + i + "_" + j);
                     }
                 }
             }
+
             m.update();
 
-            GRBLinExpr objExpr = new GRBLinExpr();
+            ArrayList<GRBLinExpr> grbLinExprList = new ArrayList<GRBLinExpr>();
 
-            double sumL = 0.0;
-            double sumSquaredL = 0.0;
-
-            for (Integer groupId : users_g.keySet()) {
-                GRBLinExpr sumInjustices = new GRBLinExpr();
-                List<String> users = users_g.get(groupId);
-
-                for (String user : users) {
-                    for (String location : ls_g.get(groupId)) {
-                        Tuple key = new Tuple(user, location);
-                        sumInjustices.addTerm(listPreferences.get(groupId - 1).get(key), xVars.get(key));
+            for(int g = 0; g < n_groups; g++){
+                int qtdUser = users_g.get(g+1).size();
+                int qtdL = ls_g.get(g+1).size();
+                grbLinExprList.add(new GRBLinExpr());
+                for(int i = 0; i < qtdUser; i++){
+                    for(int j = 0; j < qtdL; j++){
+                        grbLinExprList.get(g).addTerm(list_lix[j][G_index.get(g+1).get(i)], grbVarList.get(g)[i][j]);
                     }
                 }
-
-                GRBVar L = m.addVar(0.0, GRB.INFINITY, 0.0, GRB.CONTINUOUS, "L_" + groupId);
-                m.addConstr(L, GRB.EQUAL, sumInjustices, "avgInjustice_" + groupId);
-
-                double LMean = sumInjustices.getValue() / users.size();
-                sumL += LMean;
-                sumSquaredL += LMean * LMean;
+                String constrName = "c1_" + g;
+                m.addConstr(grbLinExprList.get(g), GRB.EQUAL, 1.0, constrName);
             }
 
-            double groupCount = users_g.size();
-            double LMean = sumL / groupCount;
-            objExpr.addConstant(sumSquaredL / groupCount - LMean * LMean);
+            m.update();
 
-            m.setObjective(objExpr, GRB.MINIMIZE);
-
-            for (Integer groupId : users_g.keySet()) {
-                List<String> users = users_g.get(groupId);
-
-                for (String user : users) {
-                    GRBLinExpr lhs = new GRBLinExpr();
-
-                    for (String location : ls_g.get(groupId)) {
-                        Tuple key = new Tuple(user, location);
-                        lhs.addTerm(1.0, xVars.get(key));
-                    }
-
-                    String constrName = "assign_" + user;
-                    m.addConstr(lhs, GRB.EQUAL, 1.0, constrName);
-                }
+            for(int g = 0; g < n_groups; g++){
+                int qtdUser = users_g.get(g+1).size();
+                grbLinExprList.get(g).multAdd(1.0 / qtdUser, grbLinExprList.get(g));
             }
+
+            GRBLinExpr LMean = new GRBLinExpr();
+
+            for(int g = 0; g < n_groups; g++){
+                LMean.add(grbLinExprList.get(g));
+            }
+            LMean.multAdd(1.0/n_groups, LMean);
+
+            ArrayList<GRBVar> grbAuxVar = new ArrayList<>();
+            for(int g = 0; g < n_groups; g++){
+                GRBVar auxVar = m.addVar(-GRB.INFINITY, GRB.INFINITY, 0.0, GRB.CONTINUOUS, "diff"+g);
+                grbAuxVar.add(auxVar);
+                m.addConstr(grbAuxVar.get(g), GRB.EQUAL, grbLinExprList.get(g), "const_diff"+g);
+            }
+
+            m.update();
+
+            GRBQuadExpr Rgrp = new GRBQuadExpr();
+
+            for(int g = 0; g < n_groups; g++){
+                Rgrp.addTerm(1.0, grbAuxVar.get(g), grbAuxVar.get(g));
+            }
+
+            m.update();
+
+            Rgrp.multAdd(1/n_groups, Rgrp);
 
             m.optimize();
 
-            for (Map.Entry<Tuple, GRBVar> entry : xVars.entrySet()) {
-                Tuple key = entry.getKey();
-                GRBVar var = entry.getValue();
-                System.out.println(key + " : " + var.get(GRB.DoubleAttr.X));
+            for(int g = 0; g < n_groups; g++){
+                int qtdUser = users_g.get(g+1).size();
+                int qtdL = ls_g.get(g+1).size();
+                System.out.println("--GRUPO " + g);
+                for(int i = 0; i < qtdUser; i++){
+                    for(int j = 0; j < qtdL; j++){
+                        System.out.print(grbVarList.get(g)[i][j].get(GRB.DoubleAttr.X) + " ");
+                    }
+                    System.out.println("");
+                }
             }
-
         }catch (GRBException e) {
             System.out.println("Error code: " + e.getErrorCode() + ". " +
                     e.getMessage());
@@ -371,16 +383,6 @@ public class FairnessRecommendationService {
         return x1;
     }
 
-    private static GRBVar[][] addDecisionVariables(GRBModel model, String[] users, String[] items) throws GRBException {
-        GRBVar[][] variables = new GRBVar[users.length][items.length];
-        for (int i = 0; i < users.length; i++) {
-            for (int j = 0; j < items.length; j++) {
-                variables[i][j] = model.addVar(0.0, 1.0, 0.0, GRB.BINARY, users[i] + "_" + items[j]);
-            }
-        }
-        model.update(); // Integrate new variables
-        return variables;
-    }
 
 
 }
