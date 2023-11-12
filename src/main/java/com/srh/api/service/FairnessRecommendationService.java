@@ -46,6 +46,7 @@ public class FairnessRecommendationService {
         double[] difMediaUsuarios = new double[usuarios];
 
 
+
         double calculandoli[] = new double[usuarios];
 
         double li[] = new double[usuarios];
@@ -273,6 +274,8 @@ public class FairnessRecommendationService {
             }
         }
 
+        double[][] matrix_result = new double[linha][coluna];
+
         try{
             GRBEnv env = new GRBEnv(true);
             env.set("logFile", "mip.log");
@@ -282,6 +285,7 @@ public class FairnessRecommendationService {
 
             //HashMap<Tuple, GRBVar> xVars = new HashMap<>();
             ArrayList<GRBVar[][]> grbVarList = new ArrayList<>();
+            ArrayList<GRBVar[][]> grbVarList2 = new ArrayList<>();
 
 
             //Adicao variaveis
@@ -290,6 +294,7 @@ public class FairnessRecommendationService {
                 int qtdL = ls_g.get(i+1).size();
                 GRBVar[][] var = new GRBVar[qtdUser][qtdL];
                 grbVarList.add(var);
+                grbVarList2.add(new GRBVar[qtdUser][qtdL]);
             }
 
             //Preencher Variaveis
@@ -312,12 +317,13 @@ public class FairnessRecommendationService {
                 grbLinExprList.add(new GRBLinExpr());
                 grbConstList.add(new GRBLinExpr());
                 for(int i = 0; i < qtdUser; i++){
+                    GRBLinExpr expr = new GRBLinExpr();
                     for(int j = 0; j < qtdL; j++){
                         grbLinExprList.get(g).addTerm(list_lix[j][G_index.get(g+1).get(i)], grbVarList.get(g)[i][j]);
-                        grbConstList.get(g).addTerm(1, grbVarList.get(g)[i][j]);
+                        expr.addTerm(1.0, grbVarList.get(g)[i][j]);
                     }
-                    String constrName = g + "_row_sum_" + i ;
-                    m.addConstr(grbLinExprList.get(g), GRB.EQUAL, 1.0, constrName);
+                    String constrName = g + "row_sum" + i ;
+                    m.addConstr(expr, GRB.EQUAL, 1.0, constrName);
                 }
             }
 
@@ -377,7 +383,7 @@ public class FairnessRecommendationService {
             m.setObjective(Rgrp);
 
             m.optimize();*/
-
+            System.out.println("Rgrp: " + variance.getValue());
             for(int g = 0; g < n_groups; g++){
                 int qtdUser = users_g.get(g+1).size();
                 int qtdL = ls_g.get(g+1).size();
@@ -385,10 +391,15 @@ public class FairnessRecommendationService {
                 for(int i = 0; i < qtdUser; i++){
                     for(int j = 0; j < qtdL; j++){
                         System.out.print(grbVarList.get(g)[i][j].get(GRB.DoubleAttr.X) + " ");
+                        if(grbVarList.get(g)[i][j].get(GRB.DoubleAttr.X) == 1) {
+                            matrix_result[G_index.get(g+1).get(i)] = lista_x[j][G_index.get(g+1).get(i)];
+                        }
                     }
                     System.out.println("");
                 }
             }
+
+
         }catch (GRBException e) {
             System.out.println("Error code: " + e.getErrorCode() + ". " +
                     e.getMessage());
@@ -405,7 +416,4 @@ public class FairnessRecommendationService {
 
         return list_lix;
     }
-
-
-
 }
