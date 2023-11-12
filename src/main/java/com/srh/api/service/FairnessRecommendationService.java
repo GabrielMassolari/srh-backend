@@ -303,38 +303,61 @@ public class FairnessRecommendationService {
                 }
             }
 
-            m.update();
-
-            ArrayList<GRBLinExpr> grbLinExprList = new ArrayList<GRBLinExpr>();
+            ArrayList<GRBLinExpr> grbLinExprList = new ArrayList<>();
+            ArrayList<GRBLinExpr> grbConstList = new ArrayList<>();
 
             for(int g = 0; g < n_groups; g++){
                 int qtdUser = users_g.get(g+1).size();
                 int qtdL = ls_g.get(g+1).size();
                 grbLinExprList.add(new GRBLinExpr());
+                grbConstList.add(new GRBLinExpr());
                 for(int i = 0; i < qtdUser; i++){
                     for(int j = 0; j < qtdL; j++){
                         grbLinExprList.get(g).addTerm(list_lix[j][G_index.get(g+1).get(i)], grbVarList.get(g)[i][j]);
+                        grbConstList.get(g).addTerm(1, grbVarList.get(g)[i][j]);
                     }
+                    String constrName = g + "_row_sum_" + i ;
+                    m.addConstr(grbLinExprList.get(g), GRB.EQUAL, 1.0, constrName);
                 }
-                String constrName = "c1_" + g;
-                m.addConstr(grbLinExprList.get(g), GRB.EQUAL, 1.0, constrName);
             }
 
             m.update();
 
-            for(int g = 0; g < n_groups; g++){
-                int qtdUser = users_g.get(g+1).size();
-                grbLinExprList.get(g).multAdd(1.0 / qtdUser, grbLinExprList.get(g));
-            }
-
             GRBLinExpr LMean = new GRBLinExpr();
+            GRBVar LMeanVar = m.addVar(-GRB.INFINITY, GRB.INFINITY, 0, GRB.CONTINUOUS, "avgTotalVar");
 
             for(int g = 0; g < n_groups; g++){
                 LMean.add(grbLinExprList.get(g));
             }
-            LMean.multAdd(1.0/n_groups, LMean);
 
-            ArrayList<GRBVar> grbAuxVar = new ArrayList<>();
+            LMean.multAdd(1.0 / usuarios, LMean);
+
+            m.addConstr(LMeanVar, GRB.EQUAL, LMean, "avgTotalConstr");
+
+            // Variável auxiliar para o quadrado da média das médias
+            GRBVar avgTotalSq = m.addVar(0, GRB.INFINITY, 0, GRB.CONTINUOUS, "avgTotalSq");
+
+            // Restrição quadrática para definir avgTotalSq como o quadrado de avgTotalVar
+            GRBQuadExpr quad = new GRBQuadExpr();
+            quad.addTerm(1.0, LMeanVar, LMeanVar); // adiciona o termo quadrático
+            m.addQConstr(quad, GRB.EQUAL, avgTotalSq, "avgTotalSqConstr");
+
+            // Função objetivo: Minimizar a variância das médias
+
+            GRBLinExpr variance = new GRBLinExpr();
+            variance.addTerm(1.0, avgTotalSq);
+            variance.addTerm(-1.0, LMeanVar);
+            variance.addTerm(-1.0, LMeanVar);
+            m.setObjective(variance, GRB.MINIMIZE);
+
+            // Otimizar o modelo
+            m.optimize();
+
+
+
+
+
+/*            ArrayList<GRBVar> grbAuxVar = new ArrayList<>();
             for(int g = 0; g < n_groups; g++){
                 GRBVar auxVar = m.addVar(-GRB.INFINITY, GRB.INFINITY, 0.0, GRB.CONTINUOUS, "diff"+g);
                 grbAuxVar.add(auxVar);
@@ -346,14 +369,14 @@ public class FairnessRecommendationService {
             GRBQuadExpr Rgrp = new GRBQuadExpr();
 
             for(int g = 0; g < n_groups; g++){
-                Rgrp.addTerm(1.0, grbAuxVar.get(g), grbAuxVar.get(g));
+                Rgrp.addTerm(1.0/n_groups, grbAuxVar.get(g), grbAuxVar.get(g));
             }
 
             m.update();
 
-            Rgrp.multAdd(1/n_groups, Rgrp);
+            m.setObjective(Rgrp);
 
-            m.optimize();
+            m.optimize();*/
 
             for(int g = 0; g < n_groups; g++){
                 int qtdUser = users_g.get(g+1).size();
@@ -380,7 +403,7 @@ public class FairnessRecommendationService {
         System.out.println("Antes: " + Arrays.toString(li));
         System.out.println("Dps: " + Arrays.toString(lix));
 
-        return x1;
+        return list_lix;
     }
 
 
