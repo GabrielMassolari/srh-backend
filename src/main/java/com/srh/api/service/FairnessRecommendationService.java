@@ -399,6 +399,47 @@ public class FairnessRecommendationService {
                 }
             }
 
+            double result_li[] = new double[usuarios];
+            auxLi = 0;
+            qtdRepeticao = 0;
+            //CALCULANDO LI ( U = USUARIO DA POSIÇÃO ZERO (0))
+            for(int l = 0; l < linha; l++){
+                for(int c = 0; c < coluna; c++){
+                    if(xoriginal[l][c] == 0) {
+                        auxLi = auxLi + (Math.pow(matrix_result[l][c] - xavaliacao[l][c], 2) / 4);
+                        qtdRepeticao++;
+                    }
+                }
+                result_li[l] = auxLi / qtdRepeticao;
+                auxLi = 0;
+                qtdRepeticao = 0;
+            }
+
+            double media_li_g[] = new double[n_groups];
+
+            for(int i = 0; i < n_groups; i++){
+                double auxMediaLi = 0;
+                for(int u: G_index.get(i+1)){
+                    auxMediaLi += result_li[u];
+                }
+                media_li_g[i] = auxMediaLi / G_index.get(i+1).size();
+            }
+
+            double mediaLi = 0;
+            for(int i = 0; i < n_groups; i++){
+                mediaLi += media_li_g[i];
+            }
+            mediaLi = mediaLi / n_groups;
+
+            double rgrp = 0;
+
+            for(int i = 0; i < n_groups; i++){
+                rgrp += (Math.pow(media_li_g[i] - mediaLi, 2));
+            }
+
+            rgrp = rgrp / n_groups;
+            System.out.println("Rgrp: " + rgrp);
+
 
         }catch (GRBException e) {
             System.out.println("Error code: " + e.getErrorCode() + ". " +
@@ -411,9 +452,10 @@ public class FairnessRecommendationService {
         System.out.println(users_g);
         System.out.println(ls_g);
 
+
         System.out.println("Antes: " + Arrays.toString(li));
         System.out.println("Dps: " + Arrays.toString(lix));
 
-        return list_lix;
+        return matrix_result;
     }
 }
