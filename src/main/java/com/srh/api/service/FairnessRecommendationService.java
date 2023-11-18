@@ -192,6 +192,31 @@ public class FairnessRecommendationService {
             qtdRepeticao = 0;
         }
 
+
+        double media_li_g_antes[] = new double[n_groups];
+
+        for(int i = 0; i < n_groups; i++){
+            double auxMediaLi = 0;
+            for(int u: G_index.get(i+1)){
+                auxMediaLi += li[u];
+            }
+            media_li_g_antes[i] = auxMediaLi / G_index.get(i+1).size();
+        }
+
+        double mediaLiAntes = 0;
+        for(int i = 0; i < n_groups; i++){
+            mediaLiAntes += media_li_g_antes[i];
+        }
+        mediaLiAntes = mediaLiAntes / n_groups;
+
+        double rgrpAntes = 0;
+
+        for(int i = 0; i < n_groups; i++){
+            rgrpAntes += (Math.pow(media_li_g_antes[i] - mediaLiAntes, 2));
+        }
+
+        rgrpAntes = rgrpAntes / n_groups;
+
 //        int u = 0;
 //        while (u < coluna) {
 //            //COMPRANDO OS ERROS DA MATRIZE ESTIMADAS - A MATRIZ ORIGINAL
@@ -438,9 +463,9 @@ public class FairnessRecommendationService {
             }
 
             rgrp = rgrp / n_groups;
-            System.out.println("Rgrp: " + rgrp);
-
-
+            System.out.println("RgrpAntes: " + rgrpAntes);
+            System.out.println("RgrpDepois: " + rgrp);
+            
         }catch (GRBException e) {
             System.out.println("Error code: " + e.getErrorCode() + ". " +
                     e.getMessage());
