@@ -1,6 +1,5 @@
 package com.srh.api.service;
 
-
 import com.srh.api.model.ItemRating;
 import com.srh.api.model.Recommendation;
 import com.srh.api.model.RecommendationRating;
@@ -45,14 +44,14 @@ public class FairnessRecommendationService {
         int[] celulasNaoConhecidas = new int[usuarios];
         double[] difMediaUsuarios = new double[usuarios];
 
-
-
         double calculandoli[] = new double[usuarios];
 
         double li[] = new double[usuarios];
         double totali = 0;
         double mediali = 0;
         double rindv = 0;
+
+        double[][] result_ = new double[1][2];
 
         // Geração do G
         Map<Integer, ArrayList<Integer>> G = new HashMap<>();
@@ -88,7 +87,6 @@ public class FairnessRecommendationService {
             users_g.put(groupNumber, userIdentifiers);
         }
 
-
         // Geração do ls_G
         HashMap<Integer, List<String>> ls_g = new HashMap<>();
 
@@ -102,7 +100,6 @@ public class FairnessRecommendationService {
 
             ls_g.put(groupNumber, lsIdentifier);
         }
-
 
         Iterable<ItemRating> avaliacoesItens =
                 itemRatingRepository.findAll();
@@ -217,24 +214,6 @@ public class FairnessRecommendationService {
 
         rgrpAntes = rgrpAntes / n_groups;
 
-//        int u = 0;
-//        while (u < coluna) {
-//            //COMPRANDO OS ERROS DA MATRIZE ESTIMADAS - A MATRIZ ORIGINAL
-//            for (int lo = 0; lo < xoriginal.length; lo++) {
-//                //int u = 0;
-//                if (xoriginal[lo][u] == 0) {
-//                    calculandoli[u] = calculandoli[u] + (Math.pow(xavaliacao[lo][u] - xestimada[lo][u], 2));
-//                }
-//            }
-//            u++;
-//        }
-
-//        //ENCONTRANDO O li DA JUSTIÇA INDIVIDUAL DE CADA USUÁRIO
-//        for (int i = 0; i < usuarios; i++) {
-//            li[i] = calculandoli[i] / celulasConhecidas[i];
-//            //System.out.println("LI[" + i + "]: " + li[i]);
-//        }
-
         double[][] x1 = new double[linha][coluna];
         for(int i = 0; i < list_number; i++){
             x1 = new double[linha][coluna];
@@ -248,10 +227,17 @@ public class FairnessRecommendationService {
 
                         // Calcule o número aleatório ajustado para o intervalo desejado
                         if(difMediaUsuarios[l] >= 0){
-                            numeroFinal = xestimada[l][c] + (numeroAleatorio * li[l]);
-                        }else {
                             numeroFinal = xestimada[l][c] - (numeroAleatorio * li[l]);
+                        }else {
+                            numeroFinal = xestimada[l][c] + (numeroAleatorio * li[l]);
                         }
+
+                        if(numeroFinal > 5){
+                            numeroFinal = 5;
+                        }else if(numeroFinal < 1){
+                            numeroFinal = 1;
+                        }
+
                         x1[l][c] = numeroFinal;
                     }else {
                         x1[l][c] = xoriginal[l][c];
@@ -260,7 +246,6 @@ public class FairnessRecommendationService {
             }
             lista_x[i] = x1;
         }
-
 
         double lix[] = new double[usuarios];
         double[][] list_lix = new double[list_number][usuarios];
@@ -384,43 +369,16 @@ public class FairnessRecommendationService {
             // Otimizar o modelo
             m.optimize();
 
-
-
-
-
-/*            ArrayList<GRBVar> grbAuxVar = new ArrayList<>();
-            for(int g = 0; g < n_groups; g++){
-                GRBVar auxVar = m.addVar(-GRB.INFINITY, GRB.INFINITY, 0.0, GRB.CONTINUOUS, "diff"+g);
-                grbAuxVar.add(auxVar);
-                m.addConstr(grbAuxVar.get(g), GRB.EQUAL, grbLinExprList.get(g), "const_diff"+g);
-            }
-
-            m.update();
-
-            GRBQuadExpr Rgrp = new GRBQuadExpr();
-
-            for(int g = 0; g < n_groups; g++){
-                Rgrp.addTerm(1.0/n_groups, grbAuxVar.get(g), grbAuxVar.get(g));
-            }
-
-            m.update();
-
-            m.setObjective(Rgrp);
-
-            m.optimize();*/
-            System.out.println("Rgrp: " + variance.getValue());
             for(int g = 0; g < n_groups; g++){
                 int qtdUser = users_g.get(g+1).size();
                 int qtdL = ls_g.get(g+1).size();
-                System.out.println("--GRUPO " + g);
+
                 for(int i = 0; i < qtdUser; i++){
                     for(int j = 0; j < qtdL; j++){
-                        System.out.print(grbVarList.get(g)[i][j].get(GRB.DoubleAttr.X) + " ");
                         if(grbVarList.get(g)[i][j].get(GRB.DoubleAttr.X) == 1) {
                             matrix_result[G_index.get(g+1).get(i)] = lista_x[j][G_index.get(g+1).get(i)];
                         }
                     }
-                    System.out.println("");
                 }
             }
 
@@ -463,23 +421,34 @@ public class FairnessRecommendationService {
             }
 
             rgrp = rgrp / n_groups;
-            System.out.println("RgrpAntes: " + rgrpAntes);
-            System.out.println("RgrpDepois: " + rgrp);
-            
+
+            double rmseDps = 0;
+            double rmseAnt = 0;
+            double qtdPred = 0;
+
+            for(int l = 0; l < linha; l++){
+                for(int c = 0; c < coluna; c++){
+                    if(xoriginal[l][c] == 0){
+                        rmseAnt = rmseAnt + Math.pow(xestimada[l][c] - xavaliacao[l][c], 2);
+                        rmseDps = rmseDps + Math.pow(matrix_result[l][c] - xavaliacao[l][c], 2);
+                        qtdPred++;
+                    }
+                }
+            }
+
+            rmseAnt = rmseAnt/qtdPred;
+            rmseAnt = Math.sqrt(rmseAnt);
+
+            rmseDps = rmseDps/qtdPred;
+            rmseDps = Math.sqrt(rmseDps);
+
+            result_[0][0] = rgrp;
+            result_[0][1] = rmseDps;
+
         }catch (GRBException e) {
             System.out.println("Error code: " + e.getErrorCode() + ". " +
                     e.getMessage());
         }
-
-
-        System.out.println(G);
-        System.out.println(G_index);
-        System.out.println(users_g);
-        System.out.println(ls_g);
-
-
-        System.out.println("Antes: " + Arrays.toString(li));
-        System.out.println("Dps: " + Arrays.toString(lix));
 
         return matrix_result;
     }
